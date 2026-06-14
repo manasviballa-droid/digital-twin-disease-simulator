@@ -142,6 +142,11 @@ class ChartsWidget(QWidget):
         self.data_history.append(data)
         self._redraw_all()
 
+    def set_history(self, days, data_history):
+        self.days = list(days)
+        self.data_history = list(data_history)
+        self._redraw_all()
+
     def _get_palette(self):
         return DISEASE_PALETTE.get(self.current_disease, DISEASE_PALETTE["Malaria"])
 

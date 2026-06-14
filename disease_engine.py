@@ -57,9 +57,9 @@ MEDICATION_EFFECTS = {
 
     "Chloroquine": {
         "fever_reduction": 1.2,
-        "recovery_boost": 0.15,
+        "recovery_boost": 0.0,
         "parasite_clearance": 0.6,
-        "organ_protection": 0.2,
+        "organ_protection": 0.0,
         "side_effects": ["GI Upset", "Vision Changes"],
         "diseases": ["Malaria"]
     },
@@ -81,15 +81,15 @@ MEDICATION_EFFECTS = {
         "diseases": ["Dengue Fever", "Chikungunya", "Malaria"]
     },
     "Oral Rehydration (ORT)": {
-        "fever_reduction": 0.3,
-        "recovery_boost": 0.15,
+        "fever_reduction": 0.0,
+        "recovery_boost": 0.0,
         "parasite_clearance": 0.0,
-        "organ_protection": 0.25,
+        "organ_protection": 0.0,
         "side_effects": [],
         "diseases": ["Dengue Fever", "Chikungunya"]
     },
     "IV Fluids": {
-        "fever_reduction": 0.5,
+        "fever_reduction": 0.0,
         "recovery_boost": 0.20,
         "parasite_clearance": 0.0,
         "organ_protection": 0.40,
@@ -98,18 +98,18 @@ MEDICATION_EFFECTS = {
     },
     "Platelet Transfusion": {
         "fever_reduction": 0.0,
-        "recovery_boost": 0.10,
+        "recovery_boost": 0.0,
         "parasite_clearance": 0.0,
-        "organ_protection": 0.5,
+        "organ_protection": 0.0,
         "side_effects": ["Transfusion Reaction (rare)"],
         "diseases": ["Dengue Fever"]
     },
     # Chikungunya meds
     "Anti-inflammatory (NSAIDs)": {
         "fever_reduction": 1.0,
-        "recovery_boost": 0.12,
+        "recovery_boost": 0.0,
         "parasite_clearance": 0.0,
-        "organ_protection": 0.2,
+        "organ_protection": 0.0,
         "side_effects": ["GI Irritation", "Renal Stress"],
         "diseases": ["Chikungunya"]
     },
@@ -117,17 +117,8 @@ MEDICATION_EFFECTS = {
         "fever_reduction": 0.8,
         "recovery_boost": 0.08,
         "parasite_clearance": 0.0,
-        "organ_protection": 0.15,
+        "organ_protection": 0.0,
         "side_effects": ["Immunosuppression", "Blood Sugar Rise"],
-        "diseases": ["Chikungunya"]
-    },
-    "Physiotherapy": {
-        "fever_reduction": 0.0,
-        "recovery_boost": 0.18,
-        "parasite_clearance": 0.0,
-        "organ_protection": 0.3,
-        "side_effects": [],
-        "diseases": ["Chikungunya"]
     },
 }
 

@@ -699,7 +699,10 @@ class MainWindow(QMainWindow):
         self.body_widget.update_disease_visualization(day, data)
         self.organ_panel.update_organs(data['organ_risks'])
         self.dashboard.update_vitals(day, data)
-        self.charts.add_data_point(day, data)
+        # Re-generate history up to the selected day for clean chronological plotting
+        history_days = list(range(day + 1))
+        history_data = [self.disease_engine.get_day_data(d, self.medications) for d in history_days]
+        self.charts.set_history(history_days, history_data)
         self._update_symptoms(data)
 
     def _update_symptoms(self, data):

@@ -26,7 +26,6 @@ DISEASE_MEDICATIONS = {
         ("Paracetamol", "#5a8fd4", "Fever & mild pain\nFirst choice analgesic"),
         ("Anti-inflammatory (NSAIDs)", "#5a8fd4", "Joint & muscle pain\nIbuprofen/Naproxen"),
         ("Corticosteroids", "#5a8fd4", "Severe arthritis\nShort-term use"),
-        ("Physiotherapy", "#5a8fd4", "Joint rehabilitation\nRestores mobility"),
     ],
 }
 

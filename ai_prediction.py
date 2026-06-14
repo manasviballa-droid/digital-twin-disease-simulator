@@ -85,6 +85,16 @@ class AIPredictionEngine:
                     all_side_effects.extend(side)
                     
             summary_points = []
+            if disease == "Malaria" and "Chloroquine" in medications:
+                summary_points.append("• <b>Chloroquine Action</b>: It controls thermal and reduces risk of spreading.")
+            if disease == "Dengue Fever" and "Oral Rehydration (ORT)" in medications:
+                summary_points.append("• <b>Oral Rehydration Action</b>: Maintenance of electrolyte balance and maintenance of overall fluids.")
+            if disease == "Dengue Fever" and "IV Fluids" in medications:
+                summary_points.append("• <b>IV Fluids Action</b>: Maintenance of hydration and electrolyte balance.")
+            if disease == "Dengue Fever" and "Platelet Transfusion" in medications:
+                summary_points.append("• <b>Platelet Transfusion Action</b>: To reduce risk of bleeding, to reduce infections, and maintenance of platelets.")
+            if disease == "Chikungunya" and "Anti-inflammatory (NSAIDs)" in medications:
+                summary_points.append("• <b>Anti-inflammatory Action</b>: Temperature reduces, pain reduces, and reduces risk of rashes.")
             if total_fever_red > 0:
                 summary_points.append(f"• <b>Thermal Control</b>: Fever temperature reduced by {total_fever_red*1.8:.1f}°F, lowering cardiovascular stress.")
             if total_organ_prot > 0:
@@ -168,7 +178,7 @@ Estimated Recovery: {colored(f'~{recovery_days} days remaining', 'GOOD' if recov
             if prog > 0.6:
                 complications.append("Post-infectious neuropathy risk")
             if prog > 0.5:
-                complications.append("Persistent joint damage — physiotherapy recommended")
+                complications.append("Persistent joint damage — physical therapy and rest recommended")
 
         if not complications:
             complications.append("No immediate complications detected")
