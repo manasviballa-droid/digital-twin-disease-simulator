@@ -310,42 +310,6 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(10)
 
-        # Data Source Mode Selection
-        source_group = QGroupBox("  DATA SOURCE")
-        sg_layout = QVBoxLayout(source_group)
-        
-        mode_layout = QHBoxLayout()
-        self.sim_mode_btn = QPushButton("SIMULATOR")
-        self.csv_mode_btn = QPushButton("IMPORT CSV")
-        self.sim_mode_btn.setCheckable(True)
-        self.csv_mode_btn.setCheckable(True)
-        self.sim_mode_btn.setChecked(True)
-        
-        # Desaturated style for mode selection
-        self.sim_mode_btn.setStyleSheet("QPushButton { font-size: 9px; padding: 4px; }")
-        self.csv_mode_btn.setStyleSheet("QPushButton { font-size: 9px; padding: 4px; }")
-        
-        mode_layout.addWidget(self.sim_mode_btn)
-        mode_layout.addWidget(self.csv_mode_btn)
-        sg_layout.addLayout(mode_layout)
-        
-        self.import_btn = QPushButton("📂  IMPORT PATIENT CSV")
-        self.import_btn.setVisible(False)
-        self.import_btn.setFixedHeight(28)
-        self.import_btn.setStyleSheet("""
-            QPushButton {
-                font-size: 10px;
-                color: #bfa054;
-                border: 1px dashed #bfa054;
-                background: transparent;
-            }
-            QPushButton:hover {
-                background: #bfa05422;
-            }
-        """)
-        sg_layout.addWidget(self.import_btn)
-        
-        layout.addWidget(source_group)
 
         # Disease selection
         disease_group = QGroupBox("  DISEASE SELECTION")
@@ -615,85 +579,10 @@ class MainWindow(QMainWindow):
         self.reset_btn.clicked.connect(self.reset_simulation)
         self.day_slider.valueChanged.connect(self.seek_to_day)
         self.med_panel.medication_added.connect(self.add_medication)
-        self.sim_mode_btn.clicked.connect(self.set_simulated_mode)
-        self.csv_mode_btn.clicked.connect(self.set_csv_mode)
-        self.import_btn.clicked.connect(self.import_patient_csv)
 
     def _setup_timer(self):
         self.timer = QTimer()
         self.timer.timeout.connect(self.advance_day)
-
-    def set_simulated_mode(self):
-        self.sim_mode_btn.setChecked(True)
-        self.csv_mode_btn.setChecked(False)
-        self.import_btn.setVisible(False)
-        self.disease_engine.disable_csv_mode()
-        
-        # Restore disease selection buttons
-        for frame, btn, color in self.disease_buttons.values():
-            btn.setEnabled(True)
-            
-        self.max_days = 21
-        self.day_slider.setRange(0, self.max_days)
-        self.reset_simulation()
-
-    def set_csv_mode(self):
-        self.sim_mode_btn.setChecked(False)
-        self.csv_mode_btn.setChecked(True)
-        self.import_btn.setVisible(True)
-        
-        # If no CSV is loaded yet, prompt the user to load one
-        if not self.disease_engine.is_csv_mode:
-            self.import_patient_csv()
-        else:
-            self.update_display(self.current_day)
-
-    def import_patient_csv(self):
-        from PyQt6.QtWidgets import QFileDialog, QMessageBox
-        file_path, _ = QFileDialog.getOpenFileName(
-            self, "Import Clinical Patient CSV", "", "CSV Files (*.csv)"
-        )
-        if file_path:
-            success, message = self.disease_engine.load_patient_csv(file_path)
-            if success:
-                QMessageBox.information(self, "Data Imported", message)
-                # Set slider range to match the number of records
-                self.max_days = len(self.disease_engine.csv_data) - 1
-                self.day_slider.setRange(0, self.max_days)
-                
-                # Autodetect profiles from columns
-                disease_guess = "Dengue Fever"
-                cols = self.disease_engine.csv_data.columns
-                if 'parasite_load' in cols or 'spleen_size' in cols:
-                    disease_guess = "Malaria"
-                elif 'joint_pain' in cols or 'joint_swelling' in cols or 'joint_stiffness' in cols:
-                    disease_guess = "Chikungunya"
-                
-                self.current_disease = disease_guess
-                self.disease_engine.set_disease(disease_guess)
-                self.disease_engine.is_csv_mode = True  # restore csv mode as set_disease resets engine state
-                self.body_widget.set_disease(disease_guess)
-                self.med_panel.set_disease(disease_guess)
-                self.charts.set_disease(disease_guess)
-                self.dashboard.set_disease(disease_guess)
-                
-                # Disable disease selection buttons in CSV mode since source drives the disease profile
-                for d, (frame, btn, color) in self.disease_buttons.items():
-                    btn.setEnabled(False)
-                    if d == disease_guess:
-                        frame.setStyleSheet(f"QFrame {{ border: 1px solid {color}; border-radius: 6px; background: {color}22; }}")
-                    else:
-                        frame.setStyleSheet("QFrame { border: 1px solid #0d2d5e; border-radius: 6px; background: #070f20; }")
-                
-                self.reset_simulation()
-                self.status_lbl.setText(f"● Clinical CSV loaded ({disease_guess} profile detected) — Press START to begin visualization")
-            else:
-                QMessageBox.warning(self, "Import Failed", message)
-                self.set_simulated_mode()
-        else:
-            # If they canceled and no CSV is active, go back to simulated
-            if not self.disease_engine.is_csv_mode:
-                self.set_simulated_mode()
 
     def select_disease(self, disease):
         self.current_disease = disease

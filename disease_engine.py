@@ -158,10 +158,6 @@ class DiseaseEngine:
         self.recovery_boost = 0.0
         self.organ_protection = 0.0
         self.rng = np.random.RandomState(42)
-        # CSV mode integration
-        self.is_csv_mode = False
-        self.csv_data = None
-        self.csv_file_path = ""
 
     def set_disease(self, disease: str):
         self.current_disease = disease
@@ -174,32 +170,6 @@ class DiseaseEngine:
         self.recovery_boost = 0.0
         self.organ_protection = 0.0
         self.rng = np.random.RandomState(42)
-        # Clear CSV mode on reset if needed, or keep it. Let's clear it to keep simulation baseline clean.
-        self.is_csv_mode = False
-        self.csv_data = None
-        self.csv_file_path = ""
-
-    def load_patient_csv(self, file_path: str):
-        """Load clinical patient dataset from CSV file."""
-        try:
-            df = pd.read_csv(file_path)
-            # Ensure day column exists
-            if 'day' not in df.columns:
-                df['day'] = range(len(df))
-            # Set index to day
-            df = df.set_index('day', drop=False)
-            self.csv_data = df
-            self.csv_file_path = file_path
-            self.is_csv_mode = True
-            return True, f"Loaded {len(df)} days of patient records."
-        except Exception as e:
-            return False, f"Failed to load CSV: {str(e)}"
-
-    def disable_csv_mode(self):
-        """Disable CSV dataset mode and return to simulated engine."""
-        self.is_csv_mode = False
-        self.csv_data = None
-        self.csv_file_path = ""
 
     def apply_medication(self, medication: str):
         if medication in MEDICATION_EFFECTS:
@@ -211,76 +181,6 @@ class DiseaseEngine:
 
     def get_day_data(self, day: int, medications: List[str] = None) -> Dict:
         """Generate comprehensive vital signs and organ data for a given day."""
-        # Check if we are running in clinical CSV mode
-        if self.is_csv_mode and self.csv_data is not None:
-            if day in self.csv_data.index:
-                row = self.csv_data.loc[day]
-                
-                # Detect temperature scale (Celsius vs Fahrenheit)
-                raw_temp = float(row.get('temperature', 36.6))
-                if raw_temp > 50:
-                    # It's in Fahrenheit, convert to Celsius internally for simulator consistency
-                    temp_c = (raw_temp - 32) / 1.8
-                else:
-                    temp_c = raw_temp
-
-                # Apply active medication fever reduction to the clinical temperature (constrained to >= 36.0C to avoid hypothermia)
-                temp_c = max(36.0, temp_c - self.fever_reduction)
-
-                # Extract and map all required clinical vitals
-                vitals = {
-                    'temperature': round(temp_c, 1),
-                    'heart_rate': int(row.get('heart_rate', 72)),
-                    'systolic_bp': int(row.get('systolic_bp', 120)),
-                    'diastolic_bp': int(row.get('diastolic_bp', 80)),
-                    'oxygen_saturation': round(float(row.get('oxygen_saturation', 98.5)), 1),
-                    'platelet_count': int(row.get('platelet_count', 250)),
-                    'hemoglobin': round(float(row.get('hemoglobin', 15.0)), 1),
-                    'wbc_count': int(row.get('wbc_count', 7000)),
-                    'rbc_count': round(float(row.get('rbc_count', 5.2)), 2),
-                    'fatigue': int(row.get('fatigue', 0)),
-                    'hydration': int(row.get('hydration', 100)),
-                    'pain_level': int(row.get('pain_level', 0)),
-                    'inflammation': int(row.get('inflammation', 0)),
-                    'nausea': int(row.get('nausea', 0)),
-                    'headache': int(row.get('headache', 0)),
-                    'weakness': int(row.get('weakness', 0)),
-                }
-
-                # Optional disease-specific parameters
-                vitals['spleen_size'] = float(row.get('spleen_size', 1.0))
-                vitals['liver_enzymes'] = int(row.get('liver_enzymes', 40))
-                vitals['parasite_load'] = int(row.get('parasite_load', 0))
-                vitals['rash_severity'] = int(row.get('rash_severity', 0))
-                vitals['bleeding_risk'] = int(row.get('bleeding_risk', 0))
-                vitals['plasma_leakage'] = int(row.get('plasma_leakage', 0))
-                vitals['joint_swelling'] = int(row.get('joint_swelling', 0))
-                vitals['muscle_pain'] = int(row.get('muscle_pain', 0))
-                vitals['joint_stiffness'] = int(row.get('joint_stiffness', 0))
-
-                # Determine active progression/severity index (scaled 0.0 - 1.0)
-                prog = max(0.0, min(1.0, (temp_c - 36.5) / 4.5))
-                # For thrombocytopenia (platelet crash)
-                plt = vitals['platelet_count']
-                if plt < 150:
-                    prog = max(prog, min(1.0, (150 - plt) / 130))
-
-                # Compute clinical organ risks from the progression factor
-                vitals['organ_risks'] = self._compute_organ_risks(day, prog, self.organ_protection)
-                vitals['severity'] = prog * 100
-                
-                # Recovery probability (scales up over time and with lower progression)
-                total_days = len(self.csv_data)
-                rec_factor = (day / total_days) if total_days > 0 else 1.0
-                vitals['recovery_probability'] = max(0, min(100, (1.0 - prog) * 70 + rec_factor * 30))
-                vitals['progression'] = prog
-                vitals['day'] = day
-                vitals['disease'] = self.current_disease
-                vitals['medications'] = list(self.medications)
-                vitals['hospitalization_risk'] = max(0, min(100, prog * 85))
-
-                return vitals
-
         profile = DISEASE_PROFILES.get(self.current_disease)
         if not profile:
             return self._empty_data()
