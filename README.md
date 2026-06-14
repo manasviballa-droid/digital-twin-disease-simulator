@@ -16,7 +16,7 @@ An interactive, high-fidelity PyQt6 desktop application simulating the physiolog
     *   Adaptive, clinical color-coded status banners reflecting severity (Normal, Warning, Danger, Critical).
 *   **Disease Simulator Mode**: Mathematical model simulating standard incubation, peak, and recovery curves for Malaria, Dengue Fever, and Chikungunya.
 *   **AI Health Prediction Engine**: Generates a consolidated clinical summary detailing thermal control, organ defense metrics, recovery speeds, and side effects.
-*   **Interactive Treatment Panel**: Apply targeted medications (e.g., Artemisinin for Malaria, Paracetamol/IV fluids for Dengue, NSAIDs/Physiotherapy for Chikungunya) and immediately visualize vital signs recovering.
+*   **Interactive Treatment Panel**: Apply targeted medications (e.g., Chloroquine for Malaria, Paracetamol/IV fluids for Dengue, NSAIDs/Physiotherapy for Chikungunya) and immediately visualize vital signs recovering.
 
 ---
 

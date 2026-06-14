@@ -147,7 +147,7 @@ Estimated Recovery: {colored(f'~{recovery_days} days remaining', 'GOOD' if recov
         if disease == "Malaria":
             if prog > 0.6 and data.get('hemoglobin', 15) < 8:
                 complications.append("Severe hemolytic anemia — transfusion may be required")
-            if prog > 0.7 and 'Artemisinin (ACT)' not in medications:
+            if prog > 0.7 and 'Chloroquine' not in medications:
                 complications.append("Cerebral malaria risk — neurological involvement possible")
             if prog > 0.5:
                 complications.append("Splenomegaly — organ enlargement progressing")

@@ -54,14 +54,7 @@ DISEASE_PROFILES = {
 # Medication effects
 MEDICATION_EFFECTS = {
     # Malaria meds
-    "Artemisinin (ACT)": {
-        "fever_reduction": 1.8,
-        "recovery_boost": 0.25,
-        "parasite_clearance": 0.9,
-        "organ_protection": 0.3,
-        "side_effects": ["Nausea", "Dizziness", "Headache"],
-        "diseases": ["Malaria"]
-    },
+
     "Chloroquine": {
         "fever_reduction": 1.2,
         "recovery_boost": 0.15,

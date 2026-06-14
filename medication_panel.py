@@ -12,7 +12,6 @@ from PyQt6.QtGui import QFont
 
 DISEASE_MEDICATIONS = {
     "Malaria": [
-        ("Artemisinin (ACT)", "#5a8fd4", "First-line antimalarial\nRapid parasite clearance"),
         ("Chloroquine", "#5a8fd4", "Classic antimalarial\nBlood schizonticide"),
         ("Primaquine", "#5a8fd4", "Radical cure\nEradicates liver stage"),
         ("Paracetamol", "#5a8fd4", "Fever & pain relief\nSymptomatic treatment"),
