@@ -8,7 +8,6 @@ Simulates Malaria, Dengue Fever, and Chikungunya
 import sys
 import os
 import numpy as np
-import pandas as pd
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QSplitter, QTabWidget, QLabel, QPushButton, QComboBox, QSlider,
@@ -722,8 +721,9 @@ class MainWindow(QMainWindow):
     def add_medication(self, medication):
         if medication not in self.medications:
             self.medications.append(medication)
-            self.disease_engine.apply_medication(medication)
+            self.disease_engine.apply_medication(medication, self.current_day)
             self.status_lbl.setText(f"● Medication applied: {medication}")
+            self.update_display(self.current_day)
 
     def run_ai_analysis(self):
         data = self.disease_engine.get_day_data(self.current_day, self.medications)

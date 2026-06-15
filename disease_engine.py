@@ -5,7 +5,6 @@ Malaria, Dengue Fever, and Chikungunya
 """
 
 import numpy as np
-import pandas as pd
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
@@ -136,11 +135,8 @@ def smooth_curve(x, peak_x, peak_y, start_y=0.0, end_y=0.0, total=21):
 class DiseaseEngine:
     def __init__(self):
         self.current_disease = "Malaria"
-        self.medications = []
+        self.medications = {}  # med_name -> day_administered
         self.med_effect_multiplier = 1.0
-        self.fever_reduction = 0.0
-        self.recovery_boost = 0.0
-        self.organ_protection = 0.0
         self.rng = np.random.RandomState(42)
 
     def set_disease(self, disease: str):
@@ -148,20 +144,14 @@ class DiseaseEngine:
         self.reset()
 
     def reset(self):
-        self.medications = []
+        self.medications = {}
         self.med_effect_multiplier = 1.0
-        self.fever_reduction = 0.0
-        self.recovery_boost = 0.0
-        self.organ_protection = 0.0
         self.rng = np.random.RandomState(42)
 
-    def apply_medication(self, medication: str):
+    def apply_medication(self, medication: str, day: int):
         if medication in MEDICATION_EFFECTS:
-            eff = MEDICATION_EFFECTS[medication]
-            self.fever_reduction += eff["fever_reduction"]
-            self.recovery_boost += eff["recovery_boost"]
-            self.organ_protection += eff["organ_protection"]
-            self.medications.append(medication)
+            if medication not in self.medications:
+                self.medications[medication] = day
 
     def get_day_data(self, day: int, medications: List[str] = None) -> Dict:
         """Generate comprehensive vital signs and organ data for a given day."""
@@ -173,10 +163,20 @@ class DiseaseEngine:
         progression = self._get_progression(day, profile)
         recovery_factor = self._get_recovery_factor(day, profile)
 
-        # Apply medication effects (fever reduction in Celsius)
-        med_fever = self.fever_reduction
-        med_recovery = self.recovery_boost
-        med_organ = min(0.8, self.organ_protection)
+        # Apply active medication effects dynamically for this specific day
+        med_fever = 0.0
+        med_recovery = 0.0
+        med_organ = 0.0
+
+        for med, admin_day in self.medications.items():
+            if admin_day <= day:
+                if med in MEDICATION_EFFECTS:
+                    eff = MEDICATION_EFFECTS[med]
+                    med_fever += eff.get("fever_reduction", 0.0)
+                    med_recovery += eff.get("recovery_boost", 0.0)
+                    med_organ += eff.get("organ_protection", 0.0)
+
+        med_organ = min(0.8, med_organ)
 
         effective_progression = max(0, progression * (1 - med_recovery))
         noise = self.rng.normal(0, 0.02)
@@ -197,7 +197,7 @@ class DiseaseEngine:
         data['progression'] = effective_progression
         data['day'] = day
         data['disease'] = self.current_disease
-        data['medications'] = list(self.medications)
+        data['medications'] = list(self.medications.keys())
         data['hospitalization_risk'] = max(0, min(100, effective_progression * 85))
 
         return data
