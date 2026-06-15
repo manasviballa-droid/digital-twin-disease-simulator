@@ -181,7 +181,7 @@ class DashboardWidget(QGroupBox):
         self.current_disease = disease
         self.disease_lbl._val_lbl.setText(disease[:10])
 
-    def update_vitals(self, day, data):
+    def update_vitals(self, day, data, max_days=21):
         prog = data.get('progression', 0)
         severity = data.get('severity', 0)
         recovery = data.get('recovery_probability', 0)
@@ -206,7 +206,7 @@ class DashboardWidget(QGroupBox):
         """)
 
         # Update summary
-        self.day_lbl._val_lbl.setText(f"{day}/21")
+        self.day_lbl._val_lbl.setText(f"{day}/{max_days}")
         sev_col = "#4faf8c" if severity < 30 else ("#b88a30" if severity < 60 else "#b83b3b")
         self.severity_lbl._val_lbl.setText(f"{severity:.0f}%")
         self.severity_lbl._val_lbl.setStyleSheet(f"color: {sev_col}; font-size: 10px; font-weight: bold;")

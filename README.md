@@ -1,6 +1,6 @@
-# AI Digital Twin — Human Body Disease Simulator
+# AI Digital Twin — Human Body Disease Simulator (v1.1.0)
 
-An interactive, high-fidelity PyQt6 desktop application simulating the physiological progression and treatment response of infectious diseases (Malaria, Dengue Fever, and Chikungunya). This platform features a contoured 3D humanoid body model with glowing holographic organs, a real-time vitals dashboard, clinical charts, and an AI Health Prediction Engine.
+An interactive, high-fidelity PyQt6 desktop application simulating the physiological progression and treatment response of infectious diseases (Malaria, Dengue Fever, and Chikungunya). This platform features a contoured 3D humanoid body model with glowing holographic organs, a real-time vitals dashboard, clinical charts, an interactive organ detail scanner, and an AI Health Prediction Engine.
 ---
 
 ## Key Features
@@ -8,15 +8,20 @@ An interactive, high-fidelity PyQt6 desktop application simulating the physiolog
 *   **Contoured 3D Humanoid Body Model**: 
     *   Tapered torso, neck, and limbs representing realistic anatomical proportions.
     *   Glass-like translucent body shell showing internal organs (Brain, Heart, Lungs, Liver, Spleen, Kidneys, Joints, Muscles).
-    *   Dynamic holographic wireframe scanning grid overlays on affected organs.
+    *   **Interactive Organ Selection**: Clicking any organ highlights it in the 3D viewer (alpha 0.95 opacity with an enhanced wireframe mesh) while dimming other components (alpha 0.05 opacity) to isolate the target organ.
     *   Dynamic blood vessel and skin rash rendering based on disease progression.
     *   Non-clipping camera-based zooming (`0.4x` to `5.0x`) and interactive orbital rotation.
 *   **Real-time Vitals Dashboard**:
     *   Displays Fahrenheit (°F) temperature metrics, heart rate, blood pressure, SpO₂ levels, platelets, hemoglobin, and WBC counts.
     *   Adaptive, clinical color-coded status banners reflecting severity (Normal, Warning, Danger, Critical).
+*   **Clinical Patient CSV Import Mode**:
+    *   Load real-world clinical patient records (e.g. Malaria, Dengue, Chikungunya logs) with automatic disease profile autodetection, day-slider length resizing, and hour-by-hour telemetry interpolation.
+    *   Run live medication interventions on top of historical recordings with immediate therapeutic overrides.
+*   **24-Hour Clinical Timeline & Narrative**:
+    *   Divides each day into Night, Morning, Afternoon, and Evening phases, displaying an auto-updating physiological narrative explaining diurnal fluctuations for the active disease.
 *   **Disease Simulator Mode**: Mathematical model simulating standard incubation, peak, and recovery curves for Malaria, Dengue Fever, and Chikungunya.
 *   **AI Health Prediction Engine**: Generates a consolidated clinical summary detailing thermal control, organ defense metrics, recovery speeds, and side effects.
-*   **Interactive Treatment Panel**: Apply targeted medications (e.g., Chloroquine for Malaria, Paracetamol/IV fluids for Dengue, NSAIDs/Corticosteroids for Chikungunya) and immediately visualize vital signs recovering.
+*   **Interactive Treatment Panel**: Apply targeted medications (e.g., Chloroquine for Malaria, Paracetamol, IV Fluids, Platelet Transfusion, NSAIDs, Corticosteroids) and immediately visualize vital signs recovering.
 
 ---
 
@@ -51,9 +56,11 @@ python main.py
 ├── body_model.py               # 3D Matplotlib humanoid meshes and rendering parameters
 ├── dashboard.py                # Real-time vitals card display and warning calculations
 ├── charts.py                   # Matplotlib chart panels (Fever, Vitals, Organ Risk)
-├── organ_panel.py              # Organ risk metrics list and bullet layout
+├── organ_panel.py              # Clickable organ rows and detailed scanner panels
 ├── medication_panel.py         # Drug selection buttons and interactions
 ├── ai_prediction.py           # AI Health Engine analytics template and generator
+├── monitor.py                  # Bedside ICU Monitor layout and second-by-second updates
+├── sample_clinical_*.csv       # Sample patient case datasets (Dengue, Malaria, Chikungunya)
 └── requirements.txt            # Package dependencies
 ```
 

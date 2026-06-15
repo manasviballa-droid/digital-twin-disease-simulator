@@ -121,6 +121,7 @@ class BodyModelWidget(QWidget):
         self.current_disease = "Malaria"
         self.current_day = 0
         self.current_data = {}
+        self.selected_organ = None
         self.elevation = 15
         self.azimuth = -60
         self.zoom = 1.0
@@ -230,6 +231,8 @@ class BodyModelWidget(QWidget):
         n = 18  # mesh resolution
         # Body skin is transparent when a disease is selected to show internal organs (increased visibility)
         def alpha(base_alpha):
+            if self.selected_organ is not None:
+                return base_alpha * 0.05
             return base_alpha * 0.20
 
         # ── HEAD ──
@@ -311,8 +314,24 @@ class BodyModelWidget(QWidget):
         # Title removed to prevent overlapping with bottom control widgets and tabs
         pass
 
-    def _plot_organ_surface(self, x, y, z, color, alpha, is_affected, n_res):
-        """Helper to plot organ surface with optional holographic wireframe grid overlay."""
+    def _plot_organ_surface(self, x, y, z, color, alpha, is_affected, n_res, organ_name=None):
+        """Helper to plot organ surface with optional holographic wireframe grid overlay and selection highlighting."""
+        # Handle selection highlighting
+        if self.selected_organ is not None:
+            is_selected = (organ_name == self.selected_organ) or \
+                          (organ_name == "Blood" and self.selected_organ == "Blood System")
+            
+            if is_selected:
+                # Highlight the selected organ
+                alpha = 0.95
+                if color == "#112233":
+                    color = "#7ecbf5" # blue highlight for healthy selected organ
+                is_affected = True # Force wireframe overlay for selected organ to look cool!
+            else:
+                # Dim non-selected organs
+                alpha = 0.05
+                is_affected = False # disable wireframe for non-selected
+
         if is_affected:
             # Draw shaded surface
             self.ax.plot_surface(x, y, z, color=color, alpha=alpha * 0.8, linewidth=0, shade=True)
@@ -340,14 +359,14 @@ class BodyModelWidget(QWidget):
         brain_alpha = 0.90 if has_brain else 0.02
         for side in [-1, 1]:
             bx, by, bz = make_ellipsoid(side * 0.06, 0.02, 1.85, 0.11, 0.13, 0.12, 10)
-            self._plot_organ_surface(bx, by, bz, brain_col, brain_alpha, has_brain, 10)
+            self._plot_organ_surface(bx, by, bz, brain_col, brain_alpha, has_brain, 10, "Brain")
 
         # HEART
         has_heart = "Heart" in affected
         heart_col = "#ff2d55" if has_heart else "#112233"
         heart_alpha = 0.90 if has_heart else 0.02
         hx, hy, hz = make_ellipsoid(0.1, -0.15, 1.05, 0.12, 0.1, 0.14, n)
-        self._plot_organ_surface(hx, hy, hz, heart_col, heart_alpha, has_heart, n)
+        self._plot_organ_surface(hx, hy, hz, heart_col, heart_alpha, has_heart, n, "Heart")
 
         # LUNGS (left and right)
         has_lungs = "Lungs" in affected
@@ -355,14 +374,14 @@ class BodyModelWidget(QWidget):
         lung_alpha = 0.85 if has_lungs else 0.02
         for lx_off in [-0.2, 0.2]:
             lx, ly, lz = make_ellipsoid(lx_off, -0.1, 0.95, 0.18, 0.12, 0.22, n)
-            self._plot_organ_surface(lx, ly, lz, lung_col, lung_alpha, has_lungs, n)
+            self._plot_organ_surface(lx, ly, lz, lung_col, lung_alpha, has_lungs, n, "Lungs")
 
         # LIVER
         has_liver = "Liver" in affected
         liver_col = "#ffa726" if has_liver else "#112233"
         liver_alpha = 0.90 if has_liver else 0.02
         lvx, lvy, lvz = make_ellipsoid(0.15, -0.1, 0.72, 0.22, 0.15, 0.12, n)
-        self._plot_organ_surface(lvx, lvy, lvz, liver_col, liver_alpha, has_liver, n)
+        self._plot_organ_surface(lvx, lvy, lvz, liver_col, liver_alpha, has_liver, n, "Liver")
 
         # SPLEEN (Malaria: enlarged)
         has_spleen = "Spleen" in affected
@@ -370,7 +389,7 @@ class BodyModelWidget(QWidget):
         spleen_alpha = 0.90 if has_spleen else 0.02
         spleen_scale = 1.0 + (data.get('spleen_size', 1.0) - 1.0) * 0.3 if (self.current_disease == "Malaria" and p > 0.05) else 1.0
         sx, sy, sz = make_ellipsoid(-0.28, -0.08, 0.68, 0.1 * spleen_scale, 0.07, 0.12 * spleen_scale, n)
-        self._plot_organ_surface(sx, sy, sz, spleen_col, spleen_alpha, has_spleen, n)
+        self._plot_organ_surface(sx, sy, sz, spleen_col, spleen_alpha, has_spleen, n, "Spleen")
 
         # KIDNEYS
         has_kidneys = "Kidneys" in affected
@@ -378,11 +397,11 @@ class BodyModelWidget(QWidget):
         kidney_alpha = 0.90 if has_kidneys else 0.02
         for kx_off in [-0.22, 0.22]:
             kx, ky, kz = make_ellipsoid(kx_off, -0.05, 0.52, 0.08, 0.06, 0.14, n)
-            self._plot_organ_surface(kx, ky, kz, kidney_col, kidney_alpha, has_kidneys, n)
+            self._plot_organ_surface(kx, ky, kz, kidney_col, kidney_alpha, has_kidneys, n, "Kidneys")
 
         # STOMACH (unaffected reference)
         stx, sty, stz = make_ellipsoid(-0.1, -0.12, 0.75, 0.12, 0.08, 0.1, n)
-        self._plot_organ_surface(stx, sty, stz, "#112233", 0.02, False, n)
+        self._plot_organ_surface(stx, sty, stz, "#112233", 0.02, False, n, "Stomach")
 
         # MUSCLES (Biceps and Thighs)
         has_muscles = "Muscles" in affected
@@ -391,11 +410,11 @@ class BodyModelWidget(QWidget):
         # Draw Left/Right Biceps
         for side in [-1, 1]:
             bx, by, bz = make_ellipsoid(side * 0.58, 0.0, 0.78, 0.08, 0.08, 0.16, 10)
-            self._plot_organ_surface(bx, by, bz, muscle_col, muscle_alpha, has_muscles, 10)
+            self._plot_organ_surface(bx, by, bz, muscle_col, muscle_alpha, has_muscles, 10, "Muscles")
         # Draw Left/Right Thigh Muscles
         for side in [-1, 1]:
             tx, ty, tz = make_ellipsoid(side * 0.2, 0.0, -0.26, 0.12, 0.12, 0.22, 10)
-            self._plot_organ_surface(tx, ty, tz, muscle_col, muscle_alpha, has_muscles, 10)
+            self._plot_organ_surface(tx, ty, tz, muscle_col, muscle_alpha, has_muscles, 10, "Muscles")
 
         # JOINTS (Elbows, Knees, Wrists, Ankles)
         has_joints = "Joints" in affected
@@ -404,25 +423,33 @@ class BodyModelWidget(QWidget):
         # Wrist joints
         for side in [-1, 1]:
             jwx, jwy, jwz = make_sphere(side * 0.6, 0, 0.06, 0.09, 0.08, 0.09, 10)
-            self._plot_organ_surface(jwx, jwy, jwz, joint_col, joint_alpha, has_joints, 10)
+            self._plot_organ_surface(jwx, jwy, jwz, joint_col, joint_alpha, has_joints, 10, "Joints")
         # Ankle joints
         for side in [-1, 1]:
             jax2, jay2, jaz2 = make_sphere(side * 0.2, 0, -1.15, 0.1, 0.09, 0.09, 10)
-            self._plot_organ_surface(jax2, jay2, jaz2, joint_col, joint_alpha, has_joints, 10)
+            self._plot_organ_surface(jax2, jay2, jaz2, joint_col, joint_alpha, has_joints, 10, "Joints")
         # Elbow joints
         for side in [-1, 1]:
             jex, jey, jez = make_sphere(side * 0.58, 0, 0.45, 0.12, 0.12, 0.12, 10)
-            self._plot_organ_surface(jex, jey, jez, joint_col, joint_alpha, has_joints, 10)
+            self._plot_organ_surface(jex, jey, jez, joint_col, joint_alpha, has_joints, 10, "Joints")
         # Knee joints
         for side in [-1, 1]:
             jkx, jky, jkz = make_sphere(side * 0.2, 0, -0.6, 0.14, 0.12, 0.12, 10)
-            self._plot_organ_surface(jkx, jky, jkz, joint_col, joint_alpha, has_joints, 10)
+            self._plot_organ_surface(jkx, jky, jkz, joint_col, joint_alpha, has_joints, 10, "Joints")
 
     def _draw_blood_vessels(self, progression, colors):
         """Draw blood vessel network highlighting."""
         # Bright crimson if blood is affected
         vessel_col = "#ff3b30"
         alpha = min(0.90, 0.45 + progression * 0.45)
+        
+        # Check selection
+        if self.selected_organ is not None:
+            if self.selected_organ == "Blood System":
+                alpha = 0.95
+                vessel_col = "#ff2d55"
+            else:
+                alpha = 0.05
         t = np.linspace(0, 1, 30)
 
         # Main aorta
@@ -450,6 +477,15 @@ class BodyModelWidget(QWidget):
         rng = np.random.RandomState(99)
         rash_col = colors.get("skin", "#cc2288")
         num_dots = int(progression * 80)
+        
+        alpha_val = 0.7
+        # Check selection
+        if self.selected_organ is not None:
+            if self.selected_organ == "Skin":
+                alpha_val = 0.95
+            else:
+                alpha_val = 0.05
+
         for _ in range(num_dots):
             # Random position on torso/limbs
             part = rng.choice(['torso', 'arm', 'leg'])
@@ -467,7 +503,7 @@ class BodyModelWidget(QWidget):
                 z = rng.uniform(-1.1, 0.0)
 
             rx, ry, rz = make_sphere(x, y, z, 0.025, 0.02, 0.025, 6)
-            self.ax.plot_surface(rx, ry, rz, color=rash_col, alpha=0.7, linewidth=0)
+            self.ax.plot_surface(rx, ry, rz, color=rash_col, alpha=alpha_val, linewidth=0)
 
     def _draw_labels(self, progression):
         """Draw organ labels with dotted leader lines when disease is active."""
@@ -495,19 +531,44 @@ class BodyModelWidget(QWidget):
         }
 
         for lx, ly, lz, ox, oy, oz, lbl in organ_labels.get(self.current_disease, []):
+            lbl_upper = lbl.upper()
+            is_match = False
+            if self.selected_organ:
+                so_upper = self.selected_organ.upper()
+                if so_upper == "BLOOD SYSTEM" and "BLOOD" in lbl_upper:
+                    is_match = True
+                elif so_upper in lbl_upper:
+                    is_match = True
+            
             alpha_val = 0.85
+            edge_col = '#5a8fd4'
+            line_style = ':'
+            line_w = 0.8
+            
+            if self.selected_organ is not None:
+                if is_match:
+                    alpha_val = 0.95
+                    edge_col = "#4fc3f7"
+                    line_style = '-'
+                    line_w = 1.2
+                else:
+                    alpha_val = 0.15
+                    edge_col = '#1a3a60'
+                    line_style = ':'
+                    line_w = 0.5
+
             # Draw leader line
-            self.ax.plot([lx, ox], [ly, oy], [lz, oz], color='#5a8fd4',
-                         linestyle=':', linewidth=0.8, alpha=alpha_val * 0.6)
+            self.ax.plot([lx, ox], [ly, oy], [lz, oz], color=edge_col,
+                         linestyle=line_style, linewidth=line_w, alpha=alpha_val * 0.6)
             # Draw anchor dots at both ends of the line
-            self.ax.plot([lx, ox], [ly, oy], [lz, oz], color='#5a8fd4',
+            self.ax.plot([lx, ox], [ly, oy], [lz, oz], color=edge_col,
                          marker='o', markersize=3, linestyle='None', alpha=alpha_val * 0.8)
             # Draw HUD callout label box
-            self.ax.text(lx, ly, lz, lbl, color=label_color,
+            self.ax.text(lx, ly, lz, lbl, color=label_color if is_match or self.selected_organ is None else '#1d4875',
                          fontsize=7, fontweight='bold',
                          fontfamily='monospace', alpha=alpha_val,
                          bbox=dict(boxstyle='round,pad=0.3', facecolor='#050d1a',
-                                   edgecolor='#5a8fd4', alpha=alpha_val * 0.7, lw=0.8))
+                                   edgecolor=edge_col, alpha=alpha_val * 0.7, lw=line_w))
 
     def _blend_color(self, color1, color2, factor):
         """Blend two hex colors."""

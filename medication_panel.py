@@ -32,6 +32,7 @@ DISEASE_MEDICATIONS = {
 
 class MedicationPanel(QGroupBox):
     medication_added = pyqtSignal(str)
+    medications_cleared = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__("  MEDICATION SIMULATION", parent)
@@ -171,3 +172,4 @@ class MedicationPanel(QGroupBox):
         self.active_medications = []
         self.active_text.setText("None")
         self._build_med_buttons()
+        self.medications_cleared.emit()

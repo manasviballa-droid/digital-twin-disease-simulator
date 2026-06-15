@@ -13,6 +13,7 @@ import matplotlib.patches as mpatches
 from matplotlib.lines import Line2D
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QTabWidget
 from PyQt6.QtCore import Qt
+from monitor import BedsideMonitorWidget
 
 
 CHART_STYLE = {
@@ -40,6 +41,49 @@ DISEASE_PALETTE = {
 }
 
 
+def safe_clear_axis(ax):
+    """
+    Safely clear an axes object without triggering matplotlib recursion errors.
+    This avoids the ax.clear() method which can cause circular references in matplotlib.
+    """
+    try:
+        # Remove all line artists
+        while len(ax.lines) > 0:
+            ax.lines[0].remove()
+        
+        # Remove all patch artists
+        while len(ax.patches) > 0:
+            ax.patches[0].remove()
+        
+        # Remove all text artists
+        while len(ax.texts) > 0:
+            ax.texts[0].remove()
+        
+        # Remove all collection artists (important for scatter, fill_between, etc)
+        while len(ax.collections) > 0:
+            ax.collections[0].remove()
+        
+        # Remove all image artists
+        while len(ax.images) > 0:
+            ax.images[0].remove()
+        
+        # Clear the legend
+        legend = ax.get_legend()
+        if legend is not None:
+            legend.remove()
+        
+        # Reset the axis limits to defaults
+        ax.set_xlim(0, 1)
+        ax.set_ylim(0, 1)
+        
+        # Clear tick labels
+        ax.set_xticks([])
+        ax.set_yticks([])
+        
+    except Exception as e:
+        print(f"Warning: Error clearing axis: {e}")
+
+
 def style_ax(ax, title=""):
     ax.set_facecolor(CHART_STYLE["panel_bg"])
     ax.tick_params(colors=CHART_STYLE["text"], labelsize=7)
@@ -63,6 +107,9 @@ class ChartsWidget(QWidget):
         self.tab_widget = QTabWidget()
         layout.addWidget(self.tab_widget)
 
+        self.monitor_widget = BedsideMonitorWidget()
+        self.tab_widget.addTab(self.monitor_widget, "Bedside ICU Monitor")
+
         self._build_fever_tab()
         self._build_vitals_tab()
         self._build_organ_tab()
@@ -77,14 +124,14 @@ class ChartsWidget(QWidget):
         self.fever_canvas = FigureCanvas(self.fever_fig)
         self.fever_canvas.setStyleSheet(f"background: {CHART_STYLE['bg']};")
 
+        # 3 columns: Column 0 & 1 is temp (colspan 2), Column 2 is platelets (colspan 1). WBC is removed.
         gs = GridSpec(1, 3, figure=self.fever_fig)
-        self.ax_temp = self.fever_fig.add_subplot(gs[0, 0])
-        self.ax_platelet = self.fever_fig.add_subplot(gs[0, 1])
-        self.ax_wbc = self.fever_fig.add_subplot(gs[0, 2])
+        self.ax_temp = self.fever_fig.add_subplot(gs[0, 0:2])
+        self.ax_platelet = self.fever_fig.add_subplot(gs[0, 2])
+        self.ax_wbc = None
 
         for ax, title in [(self.ax_temp, "FEVER PROGRESSION (°F)"),
-                          (self.ax_platelet, "PLATELET COUNT (×10³/μL)"),
-                          (self.ax_wbc, "WBC COUNT (/μL)")]:
+                          (self.ax_platelet, "PLATELET COUNT (×10³/μL)")]:
             style_ax(ax, title)
 
         self.tab_widget.addTab(self.fever_canvas, "Fever & Blood")
@@ -136,16 +183,22 @@ class ChartsWidget(QWidget):
         self.data_history = []
         self.days = []
         self._redraw_all()
+        self.monitor_widget.update_vitals_v2({}, {})
 
     def add_data_point(self, day, data):
         self.days.append(day)
         self.data_history.append(data)
         self._redraw_all()
+        self.monitor_widget.update_vitals_v2(data, data)
 
-    def set_history(self, days, data_history):
+    def set_history(self, days, data_history, next_day_data=None):
         self.days = list(days)
         self.data_history = list(data_history)
         self._redraw_all()
+        if self.data_history:
+            self.monitor_widget.update_vitals_v2(self.data_history[-1], next_day_data)
+        else:
+            self.monitor_widget.update_vitals_v2({}, {})
 
     def _get_palette(self):
         return DISEASE_PALETTE.get(self.current_disease, DISEASE_PALETTE["Malaria"])
@@ -160,23 +213,26 @@ class ChartsWidget(QWidget):
             canvas.draw_idle()
 
     def _draw_fever_charts(self, pal):
-        for ax in [self.ax_temp, self.ax_platelet, self.ax_wbc]:
-            ax.clear()
+        for ax in [self.ax_temp, self.ax_platelet]:
+            safe_clear_axis(ax)
             style_ax(ax)
 
         if not self.days:
+            self.ax_temp.set_ylim(96.0, 108.0)
+            self.ax_temp.set_yticks(np.arange(96.0, 108.1, 1.0))
             self.ax_temp.set_title("FEVER PROGRESSION (°F)", color=CHART_STYLE["title"],
                                     fontsize=8, fontweight='bold', fontfamily='monospace')
             self.ax_platelet.set_title("PLATELET COUNT (×10³/μL)", color=CHART_STYLE["title"],
                                         fontsize=8, fontweight='bold', fontfamily='monospace')
-            self.ax_wbc.set_title("WBC COUNT (/μL)", color=CHART_STYLE["title"],
-                                   fontsize=8, fontweight='bold', fontfamily='monospace')
             return
 
         temps_c = [d.get('temperature', 36.6) for d in self.data_history]
         temps = [t * 1.8 + 32.0 for t in temps_c]
         platelets = [d.get('platelet_count', 250) for d in self.data_history]
-        wbcs = [d.get('wbc_count', 7000) for d in self.data_history]
+
+        marker_o = None if len(self.days) > 30 else 'o'
+        marker_s = None if len(self.days) > 30 else 's'
+        m_size = 0 if len(self.days) > 30 else 3
 
         # Temp chart with fever zones
         self.ax_temp.axhspan(99.5, 101.3, alpha=0.08, color="#b88a30")
@@ -185,8 +241,9 @@ class ChartsWidget(QWidget):
         self.ax_temp.axhline(99.5, color="#b88a30", alpha=0.3, linewidth=0.8, linestyle='--')
         self.ax_temp.axhline(101.3, color="#c57552", alpha=0.3, linewidth=0.8, linestyle='--')
         self.ax_temp.fill_between(self.days, temps, 97.7, alpha=0.25, color=pal["primary"])
-        self.ax_temp.plot(self.days, temps, color=pal["primary"], linewidth=2, marker='o', markersize=3)
-        self.ax_temp.set_ylim(95.9, 107.6)
+        self.ax_temp.plot(self.days, temps, color=pal["primary"], linewidth=2, marker=marker_o, markersize=m_size)
+        self.ax_temp.set_ylim(96.0, 108.0)
+        self.ax_temp.set_yticks(np.arange(96.0, 108.1, 1.0))
         self.ax_temp.set_xlabel("Day", color=CHART_STYLE["text"], fontsize=7)
         self.ax_temp.set_ylabel("°F", color=CHART_STYLE["text"], fontsize=7)
         style_ax(self.ax_temp, "FEVER PROGRESSION (°F)")
@@ -197,23 +254,14 @@ class ChartsWidget(QWidget):
         self.ax_platelet.axhspan(100, 150, alpha=0.06, color="#b88a30")
         self.ax_platelet.axhline(150, color="#4faf8c", alpha=0.3, linewidth=0.8, linestyle='--')
         self.ax_platelet.fill_between(self.days, platelets, 0, alpha=0.25, color=pal["secondary"])
-        self.ax_platelet.plot(self.days, platelets, color=pal["secondary"], linewidth=2, marker='s', markersize=3)
+        self.ax_platelet.plot(self.days, platelets, color=pal["secondary"], linewidth=2, marker=marker_s, markersize=m_size)
         self.ax_platelet.set_xlabel("Day", color=CHART_STYLE["text"], fontsize=7)
         self.ax_platelet.set_ylabel("Count", color=CHART_STYLE["text"], fontsize=7)
         style_ax(self.ax_platelet, "PLATELET COUNT (×10³/μL)")
 
-        # WBC chart
-        self.ax_wbc.axhline(4000, color="#b88a30", alpha=0.3, linewidth=0.8, linestyle='--')
-        self.ax_wbc.axhline(11000, color="#b88a30", alpha=0.3, linewidth=0.8, linestyle='--')
-        self.ax_wbc.fill_between(self.days, wbcs, 0, alpha=0.25, color=pal["tertiary"])
-        self.ax_wbc.plot(self.days, wbcs, color=pal["tertiary"], linewidth=2, marker='^', markersize=3)
-        self.ax_wbc.set_xlabel("Day", color=CHART_STYLE["text"], fontsize=7)
-        self.ax_wbc.set_ylabel("/μL", color=CHART_STYLE["text"], fontsize=7)
-        style_ax(self.ax_wbc, "WBC COUNT (/μL)")
-
     def _draw_vitals_charts(self, pal):
         for ax in [self.ax_hr, self.ax_bp, self.ax_spo2, self.ax_hgb]:
-            ax.clear()
+            safe_clear_axis(ax)
 
         if not self.days:
             for ax, t in [(self.ax_hr, "HEART RATE (bpm)"), (self.ax_bp, "BLOOD PRESSURE (mmHg)"),
@@ -227,17 +275,21 @@ class ChartsWidget(QWidget):
         spo2s = [d.get('oxygen_saturation', 98) for d in self.data_history]
         hgbs = [d.get('hemoglobin', 15) for d in self.data_history]
 
+        marker_o = None if len(self.days) > 30 else 'o'
+        marker_s = None if len(self.days) > 30 else 's'
+        m_size = 0 if len(self.days) > 30 else 3
+
         # Heart rate
         self.ax_hr.axhline(100, color="#c57552", alpha=0.3, linewidth=0.8, linestyle='--')
         self.ax_hr.fill_between(self.days, hrs, 60, alpha=0.15, color="#b83b3b")
-        self.ax_hr.plot(self.days, hrs, color="#b83b3b", linewidth=2, marker='o', markersize=3)
+        self.ax_hr.plot(self.days, hrs, color="#b83b3b", linewidth=2, marker=marker_o, markersize=m_size)
         self.ax_hr.set_ylim(55, 140)
         style_ax(self.ax_hr, "HEART RATE (bpm)")
 
         # Blood pressure
         self.ax_bp.fill_between(self.days, sys_bp, dia_bp, alpha=0.3, color="#ce93d8")
-        self.ax_bp.plot(self.days, sys_bp, color="#ce93d8", linewidth=2, label="SYS", marker='o', markersize=3)
-        self.ax_bp.plot(self.days, dia_bp, color="#9c64d0", linewidth=2, label="DIA", marker='s', markersize=3)
+        self.ax_bp.plot(self.days, sys_bp, color="#ce93d8", linewidth=2, label="SYS", marker=marker_o, markersize=m_size)
+        self.ax_bp.plot(self.days, dia_bp, color="#9c64d0", linewidth=2, label="DIA", marker=marker_s, markersize=m_size)
         self.ax_bp.legend(fontsize=7, facecolor="#070f20", edgecolor="#0d2d5e", labelcolor="#5a8fd4")
         style_ax(self.ax_bp, "BLOOD PRESSURE (mmHg)")
 
@@ -246,19 +298,19 @@ class ChartsWidget(QWidget):
         self.ax_spo2.axhspan(92, 95, alpha=0.08, color="#b88a30")
         self.ax_spo2.axhline(95, color="#4faf8c", alpha=0.3, linewidth=0.8, linestyle='--')
         self.ax_spo2.fill_between(self.days, spo2s, 80, alpha=0.3, color="#4fc3f7")
-        self.ax_spo2.plot(self.days, spo2s, color="#4fc3f7", linewidth=2, marker='o', markersize=3)
+        self.ax_spo2.plot(self.days, spo2s, color="#4fc3f7", linewidth=2, marker=marker_o, markersize=m_size)
         self.ax_spo2.set_ylim(80, 100)
         style_ax(self.ax_spo2, "OXYGEN SATURATION (%)")
 
         # Hemoglobin
         self.ax_hgb.axhline(12, color="#b88a30", alpha=0.3, linewidth=0.8, linestyle='--')
         self.ax_hgb.fill_between(self.days, hgbs, 0, alpha=0.15, color="#5ca8b8")
-        self.ax_hgb.plot(self.days, hgbs, color="#5ca8b8", linewidth=2, marker='o', markersize=3)
+        self.ax_hgb.plot(self.days, hgbs, color="#5ca8b8", linewidth=2, marker=marker_o, markersize=m_size)
         style_ax(self.ax_hgb, "HEMOGLOBIN (g/dL)")
 
     def _draw_organ_charts(self, pal):
         for ax in [self.ax_organ_risk, self.ax_severity, self.ax_liver]:
-            ax.clear()
+            safe_clear_axis(ax)
 
         if not self.days:
             for ax, t in [(self.ax_organ_risk, "ORGAN RISK OVER TIME"),
@@ -266,6 +318,10 @@ class ChartsWidget(QWidget):
                            (self.ax_liver, "LIVER ENZYME TREND")]:
                 style_ax(ax, t)
             return
+
+        marker_o = None if len(self.days) > 30 else 'o'
+        marker_d = None if len(self.days) > 30 else 'd'
+        m_size = 0 if len(self.days) > 30 else 3
 
         # Organ risk trends - pick top 3 organs by current risk
         organ_colors = {
@@ -283,7 +339,7 @@ class ChartsWidget(QWidget):
                          for d in self.data_history]
                 col = organ_colors.get(organ, "#4fc3f7")
                 self.ax_organ_risk.plot(self.days, scores, color=col, linewidth=1.5,
-                                        label=organ[:7], alpha=0.9)
+                                        label=organ[:7], alpha=0.9, marker=marker_o, markersize=m_size)
 
         self.ax_organ_risk.legend(fontsize=6, facecolor="#070f20",
                                    edgecolor="#0d2d5e", labelcolor="#5a8fd4",
@@ -308,8 +364,6 @@ class ChartsWidget(QWidget):
         self.ax_liver.axhline(56, color="#b88a30", alpha=0.3, linewidth=0.8, linestyle='--',
                               label="Normal limit")
         self.ax_liver.fill_between(self.days, liver_enzymes, 0, alpha=0.15, color="#c57552")
-        self.ax_liver.plot(self.days, liver_enzymes, color="#c57552", linewidth=2, marker='o', markersize=3)
+        self.ax_liver.plot(self.days, liver_enzymes, color="#c57552", linewidth=2, marker=marker_o, markersize=m_size)
         self.ax_liver.set_ylabel("ALT (U/L)", color=CHART_STYLE["text"], fontsize=7)
         style_ax(self.ax_liver, "LIVER ENZYME TREND")
-
-

@@ -5,6 +5,8 @@ Infectious Disease Simulation Platform
 Simulates Malaria, Dengue Fever, and Chikungunya
 """
 
+__version__ = "1.1.0"
+
 import sys
 import os
 import numpy as np
@@ -12,7 +14,8 @@ from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QSplitter, QTabWidget, QLabel, QPushButton, QComboBox, QSlider,
     QGroupBox, QGridLayout, QScrollArea, QFrame, QProgressBar,
-    QTextEdit, QSpinBox, QCheckBox, QSizePolicy, QStackedWidget
+    QTextEdit, QSpinBox, QCheckBox, QSizePolicy, QStackedWidget,
+    QStyle, QStyleOptionSlider
 )
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QThread, QSize
 from PyQt6.QtGui import QFont, QColor, QPalette, QPixmap, QPainter, QBrush, QPen, QLinearGradient, QRadialGradient
@@ -28,17 +31,43 @@ from matplotlib.colors import LinearSegmentedColormap
 
 from disease_engine import DiseaseEngine
 from body_model import BodyModelWidget
-from organ_panel import OrganRiskPanel
+from organ_panel import OrganRiskPanel, OrganDetailPanel
 from medication_panel import MedicationPanel
 from ai_prediction import AIPredictionEngine
 from dashboard import DashboardWidget
 from charts import ChartsWidget
 
 
+class JumpSlider(QSlider):
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            opt = QStyleOptionSlider()
+            self.initStyleOption(opt)
+            gr = self.style().subControlRect(
+                QStyle.ComplexControl.CC_Slider, opt,
+                QStyle.SubControl.SC_SliderHandle, self
+            )
+            
+            pos = event.pos()
+            if gr.contains(pos):
+                super().mousePressEvent(event)
+                return
+            
+            val = self.style().sliderValueFromPosition(
+                self.minimum(), self.maximum(),
+                pos.x() if self.orientation() == Qt.Orientation.Horizontal else pos.y(),
+                self.width() if self.orientation() == Qt.Orientation.Horizontal else self.height()
+            )
+            self.setValue(val)
+            super().mousePressEvent(event)
+        else:
+            super().mousePressEvent(event)
+
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("AI Digital Twin — Infectious Disease Simulator")
+        self.setWindowTitle(f"AI Digital Twin — Infectious Disease Simulator v{__version__}")
         self.setMinimumSize(1600, 950)
         self.resize(1800, 1050)
 
@@ -49,6 +78,7 @@ class MainWindow(QMainWindow):
         self.is_running = False
         self.current_disease = "Malaria"
         self.medications = []
+        self.last_display_data = {}
 
         self._setup_style()
         self._build_ui()
@@ -310,6 +340,42 @@ class MainWindow(QMainWindow):
         layout.setSpacing(10)
 
 
+        # Data Source Mode Selection
+        source_group = QGroupBox("  DATA SOURCE")
+        sg_layout = QVBoxLayout(source_group)
+        
+        mode_layout = QHBoxLayout()
+        self.sim_mode_btn = QPushButton("SIMULATOR")
+        self.csv_mode_btn = QPushButton("IMPORT CLINICAL CSV")
+        self.sim_mode_btn.setCheckable(True)
+        self.csv_mode_btn.setCheckable(True)
+        self.sim_mode_btn.setChecked(True)
+        
+        self.sim_mode_btn.setStyleSheet("QPushButton { font-size: 9px; padding: 4px; }")
+        self.csv_mode_btn.setStyleSheet("QPushButton { font-size: 9px; padding: 4px; }")
+        
+        mode_layout.addWidget(self.sim_mode_btn)
+        mode_layout.addWidget(self.csv_mode_btn)
+        sg_layout.addLayout(mode_layout)
+        
+        self.import_btn = QPushButton("📂  IMPORT PATIENT CSV")
+        self.import_btn.setVisible(False)
+        self.import_btn.setFixedHeight(28)
+        self.import_btn.setStyleSheet("""
+            QPushButton {
+                font-size: 10px;
+                color: #bfa054;
+                border: 1px dashed #bfa054;
+                background: transparent;
+            }
+            QPushButton:hover {
+                background: #bfa05422;
+            }
+        """)
+        sg_layout.addWidget(self.import_btn)
+        
+        layout.addWidget(source_group)
+
         # Disease selection
         disease_group = QGroupBox("  DISEASE SELECTION")
         dg_layout = QVBoxLayout(disease_group)
@@ -374,20 +440,54 @@ class MainWindow(QMainWindow):
         sim_group = QGroupBox("  SIMULATION CONTROL")
         sg_layout = QVBoxLayout(sim_group)
 
-        # Day slider
+        # Day slider with arrow controls
         day_header = QHBoxLayout()
         day_lbl = QLabel("SIMULATION DAY:")
         day_lbl.setStyleSheet("color: #5a8fd4; font-size: 10px; font-weight: bold;")
+        
+        self.prev_day_btn = QPushButton("<")
+        self.prev_day_btn.setFixedSize(32, 24)
+        self.prev_day_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #0c1a30;
+                color: #4fc3f7;
+                border: 1px solid #0d2d5e;
+                border-radius: 4px;
+                font-weight: bold;
+                font-size: 12px;
+                padding: 0px;
+                margin: 0px;
+            }
+            QPushButton:hover {
+                background-color: #142a4d;
+                border-color: #4fc3f7;
+            }
+            QPushButton:disabled {
+                background-color: #070f20;
+                color: #555555;
+                border-color: #070f20;
+            }
+        """)
+        
         self.day_value_lbl = QLabel("0 / 21")
-        self.day_value_lbl.setStyleSheet("color: #4fc3f7; font-size: 12px; font-weight: bold;")
+        self.day_value_lbl.setStyleSheet("color: #4fc3f7; font-size: 12px; font-weight: bold; margin: 0 10px;")
+        
+        self.next_day_btn = QPushButton(">")
+        self.next_day_btn.setFixedSize(32, 24)
+        self.next_day_btn.setStyleSheet(self.prev_day_btn.styleSheet())
+        
         day_header.addWidget(day_lbl)
         day_header.addStretch()
+        day_header.addWidget(self.prev_day_btn)
         day_header.addWidget(self.day_value_lbl)
+        day_header.addWidget(self.next_day_btn)
         sg_layout.addLayout(day_header)
 
-        self.day_slider = QSlider(Qt.Orientation.Horizontal)
+        # Hidden slider to maintain backward compatibility
+        self.day_slider = JumpSlider(Qt.Orientation.Horizontal)
         self.day_slider.setRange(0, self.max_days)
         self.day_slider.setValue(0)
+        self.day_slider.setVisible(False)
         sg_layout.addWidget(self.day_slider)
 
         # Speed control
@@ -456,7 +556,12 @@ class MainWindow(QMainWindow):
 
         # Charts tabs
         self.charts = ChartsWidget()
-        self.charts.setMinimumHeight(280)
+        self.charts.setMinimumHeight(320)
+        
+        # Instantiate organ detailed status panel and add it to the charts tab widget
+        self.organ_detail_panel = OrganDetailPanel()
+        self.charts.tab_widget.addTab(self.organ_detail_panel, "◈ Organ Scanner")
+        
         layout.addWidget(self.charts)
 
         return container
@@ -577,11 +682,94 @@ class MainWindow(QMainWindow):
         self.pause_btn.clicked.connect(self.pause_simulation)
         self.reset_btn.clicked.connect(self.reset_simulation)
         self.day_slider.valueChanged.connect(self.seek_to_day)
+        self.prev_day_btn.clicked.connect(self.regress_day)
+        self.next_day_btn.clicked.connect(self.advance_day)
         self.med_panel.medication_added.connect(self.add_medication)
+        self.med_panel.medications_cleared.connect(self.handle_medications_cleared)
+        self.charts.monitor_widget.vitals_updated.connect(self.update_second_by_second_display)
+        self.charts.monitor_widget.timer_state_changed.connect(self.handle_monitor_timer_toggle)
+        self.charts.monitor_widget.day_completed.connect(self.advance_day)
+        self.speed_combo.currentTextChanged.connect(self.update_simulation_speed)
+        self.sim_mode_btn.clicked.connect(self.set_simulated_mode)
+        self.csv_mode_btn.clicked.connect(self.set_csv_mode)
+        self.import_btn.clicked.connect(self.import_patient_csv)
+        self.organ_panel.organ_selected.connect(self.handle_organ_selected)
 
     def _setup_timer(self):
-        self.timer = QTimer()
-        self.timer.timeout.connect(self.advance_day)
+        pass
+
+    def set_simulated_mode(self):
+        self.sim_mode_btn.setChecked(True)
+        self.csv_mode_btn.setChecked(False)
+        self.import_btn.setVisible(False)
+        self.disease_engine.disable_csv_mode()
+        
+        # Restore disease selection buttons
+        for frame, btn, color in self.disease_buttons.values():
+            btn.setEnabled(True)
+            
+        self.max_days = 21
+        self.day_slider.setRange(0, self.max_days)
+        self.reset_simulation()
+
+    def set_csv_mode(self):
+        self.sim_mode_btn.setChecked(False)
+        self.csv_mode_btn.setChecked(True)
+        self.import_btn.setVisible(True)
+        
+        # If no CSV is loaded yet, prompt the user to load one
+        if not self.disease_engine.is_csv_mode:
+            self.import_patient_csv()
+        else:
+            self.update_display(self.current_day)
+
+    def import_patient_csv(self):
+        from PyQt6.QtWidgets import QFileDialog, QMessageBox
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "Import Clinical Patient CSV", "", "CSV Files (*.csv)"
+        )
+        if file_path:
+            success, message = self.disease_engine.load_patient_csv(file_path)
+            if success:
+                QMessageBox.information(self, "Data Imported", message)
+                # Set slider range to match the number of days
+                self.max_days = self.disease_engine.max_days
+                self.day_slider.setRange(0, self.max_days)
+                
+                # Autodetect profiles from columns
+                disease_guess = "Dengue Fever"
+                cols = self.disease_engine.csv_data.columns
+                if 'parasite_load' in cols or 'spleen_size' in cols:
+                    disease_guess = "Malaria"
+                elif 'joint_pain' in cols or 'joint_swelling' in cols or 'joint_stiffness' in cols:
+                    disease_guess = "Chikungunya"
+                
+                self.current_disease = disease_guess
+                self.disease_engine.set_disease(disease_guess)
+                self.disease_engine.is_csv_mode = True  # restore csv mode as set_disease resets engine state
+                self.body_widget.set_disease(disease_guess)
+                self.med_panel.set_disease(disease_guess)
+                self.charts.set_disease(disease_guess)
+                self.dashboard.set_disease(disease_guess)
+                
+                # Disable disease selection buttons in CSV mode since source drives the disease profile
+                for d, (frame, btn, color) in self.disease_buttons.items():
+                    btn.setEnabled(False)
+                    if d == disease_guess:
+                        frame.setStyleSheet(f"QFrame {{ border: 1px solid {color}; border-radius: 6px; background: {color}22; }}")
+                    else:
+                        frame.setStyleSheet("QFrame { border: 1px solid #0d2d5e; border-radius: 6px; background: #070f20; }")
+                
+                self.reset_simulation()
+                self.status_lbl.setText(f"● Clinical CSV loaded ({disease_guess} profile detected) — Press START to begin visualization")
+            else:
+                QMessageBox.warning(self, "Import Failed", message)
+                self.set_simulated_mode()
+        else:
+            # If they canceled and no CSV is active, go back to simulated
+            if not self.disease_engine.is_csv_mode:
+                self.set_simulated_mode()
+
 
     def select_disease(self, disease):
         self.current_disease = disease
@@ -647,32 +835,90 @@ class MainWindow(QMainWindow):
         self.is_running = True
         self.start_btn.setEnabled(False)
         self.pause_btn.setEnabled(True)
-        speeds = {"0.5x": 2000, "1x": 1000, "2x": 500, "5x": 200}
-        speed = speeds.get(self.speed_combo.currentText(), 1000)
-        self.timer.start(speed)
+        self.charts.monitor_widget.set_frozen(False)
+        self.update_simulation_speed(self.speed_combo.currentText())
         self.fps_lbl.setText("SIM ENGINE: RUNNING")
         self.status_lbl.setText(f"● Simulating {self.current_disease} progression...")
 
     def pause_simulation(self):
         self.is_running = False
-        self.timer.stop()
+        self.charts.monitor_widget.set_frozen(True)
         self.start_btn.setEnabled(True)
         self.pause_btn.setEnabled(False)
         self.fps_lbl.setText("SIM ENGINE: PAUSED")
 
     def reset_simulation(self):
-        self.timer.stop()
         self.is_running = False
         self.current_day = 0
         self.medications = []
+        self.organ_panel.deselect_all()
+        self.day_slider.blockSignals(True)
         self.day_slider.setValue(0)
+        self.day_slider.blockSignals(False)
         self.start_btn.setEnabled(True)
         self.pause_btn.setEnabled(False)
         self.fps_lbl.setText("SIM ENGINE: IDLE")
         self.disease_engine.reset()
+        
+        self.med_panel.blockSignals(True)
         self.med_panel.clear_medications()
+        self.med_panel.blockSignals(False)
+        
         self.charts.reset()
+        self.charts.monitor_widget.reset_timer_clock()
+        self.charts.monitor_widget.set_frozen(True)
         self.update_display(0)
+
+    def update_second_by_second_display(self, data):
+        data['hour'] = self.charts.monitor_widget.sim_hour
+        data['medications'] = list(self.medications)
+        data['disease'] = self.current_disease
+        self.last_display_data = data
+
+        # Update 3D body model, organ risk panel, dashboard, symptom bars, and status bar
+        self.body_widget.update_disease_visualization(self.current_day, data)
+        self.organ_panel.update_organs(data['organ_risks'])
+        self.dashboard.update_vitals(self.current_day, data, self.max_days)
+        self._update_symptoms(data)
+        
+        # Update organ details
+        if self.organ_panel.selected_organ:
+            html_details = self.disease_engine.get_organ_status_html(self.organ_panel.selected_organ, data)
+            self.organ_detail_panel.update_details(html_details)
+        else:
+            self.organ_detail_panel.set_placeholder()
+        
+        sim_hour = self.charts.monitor_widget.sim_hour
+        time_str = f"{sim_hour:02d}:{self.charts.monitor_widget.sim_minute:02d}:{self.charts.monitor_widget.sim_second:02d}"
+        self.status_lbl.setText(f"● Simulating {self.current_disease} progression — Day {self.current_day} @ {time_str}")
+        self.run_ai_analysis()
+
+    def handle_monitor_timer_toggle(self, is_running):
+        if is_running:
+            self.start_simulation()
+        else:
+            self.pause_simulation()
+
+    def handle_medications_cleared(self):
+        self.medications = []
+        self.disease_engine.reset()
+        self.status_lbl.setText("● All medications cleared")
+        self.update_display(self.current_day)
+
+    def handle_organ_selected(self, organ_name):
+        self.body_widget.selected_organ = organ_name
+        self.body_widget.redraw()
+        if organ_name and self.last_display_data:
+            html_details = self.disease_engine.get_organ_status_html(organ_name, self.last_display_data)
+            self.organ_detail_panel.update_details(html_details)
+            self.charts.tab_widget.setCurrentWidget(self.organ_detail_panel)
+        else:
+            self.organ_detail_panel.set_placeholder()
+            self.charts.tab_widget.setCurrentIndex(0)
+
+    def update_simulation_speed(self, speed_text):
+        self.charts.monitor_widget.set_simulation_speed(speed_text)
+
 
     def advance_day(self):
         if self.current_day < self.max_days:
@@ -686,23 +932,50 @@ class MainWindow(QMainWindow):
             self.status_lbl.setText("● Simulation complete — Patient outcome determined")
             self.fps_lbl.setText("SIM ENGINE: COMPLETE")
 
+    def regress_day(self):
+        if self.current_day > 0:
+            self.current_day -= 1
+            self.day_slider.blockSignals(True)
+            self.day_slider.setValue(self.current_day)
+            self.day_slider.blockSignals(False)
+            self.update_display(self.current_day)
+
     def seek_to_day(self, day):
         self.current_day = day
         self.update_display(day)
 
     def update_display(self, day):
         self.day_value_lbl.setText(f"{day} / {self.max_days}")
+        self.prev_day_btn.setEnabled(day > 0)
+        self.next_day_btn.setEnabled(day < self.max_days)
         data = self.disease_engine.get_day_data(day, self.medications)
+
+        # Inject metadata
+        data['hour'] = 12
+        data['medications'] = list(self.medications)
+        data['disease'] = self.current_disease
+        self.last_display_data = data
 
         # Update all panels
         self.body_widget.update_disease_visualization(day, data)
         self.organ_panel.update_organs(data['organ_risks'])
-        self.dashboard.update_vitals(day, data)
+        self.dashboard.update_vitals(day, data, self.max_days)
+        
+        # Update organ details
+        if self.organ_panel.selected_organ:
+            html_details = self.disease_engine.get_organ_status_html(self.organ_panel.selected_organ, data)
+            self.organ_detail_panel.update_details(html_details)
+        else:
+            self.organ_detail_panel.set_placeholder()
+
         # Re-generate history up to the selected day for clean chronological plotting
         history_days = list(range(day + 1))
         history_data = [self.disease_engine.get_day_data(d, self.medications) for d in history_days]
-        self.charts.set_history(history_days, history_data)
+        next_day = min(self.max_days, day + 1)
+        next_day_data = self.disease_engine.get_day_data(next_day, self.medications)
+        self.charts.set_history(history_days, history_data, next_day_data)
         self._update_symptoms(data)
+        self.run_ai_analysis()
 
     def _update_symptoms(self, data):
         symptom_map = {
@@ -727,8 +1000,10 @@ class MainWindow(QMainWindow):
 
     def run_ai_analysis(self):
         data = self.disease_engine.get_day_data(self.current_day, self.medications)
+        sim_hour = self.charts.monitor_widget.sim_hour
+        sim_minute = self.charts.monitor_widget.sim_minute
         analysis = self.ai_engine.analyze(
-            self.current_disease, self.current_day, data, self.medications
+            self.current_disease, self.current_day, data, self.medications, sim_hour, sim_minute, self.max_days
         )
         self.ai_text.setHtml(analysis)
 

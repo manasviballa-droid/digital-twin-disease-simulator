@@ -11,7 +11,7 @@ class AIPredictionEngine:
     def __init__(self):
         self.rng = np.random.RandomState(123)
 
-    def analyze(self, disease: str, day: int, data: Dict, medications: List[str]) -> str:
+    def analyze(self, disease: str, day: int, data: Dict, medications: List[str], sim_hour: int = 0, sim_minute: int = 0, max_days: int = 21) -> str:
         color_map = {
             "CRITICAL": "#b83b3b", "HIGH": "#c45d30", "MEDIUM": "#b88a30",
             "LOW": "#4faf8c", "GOOD": "#4faf8c", "GUARDED": "#b88a30", "POOR": "#c45d30"
@@ -44,7 +44,7 @@ class AIPredictionEngine:
         composite_risk = min(100, severity + critical_count * 15 + high_count * 8)
 
         # Duration estimate
-        remaining = max(1, 21 - day)
+        remaining = max(1, max_days - day)
         with_meds = max(1, remaining - len(medications) * 2)
         recovery_days = with_meds if medications else remaining
 
@@ -108,6 +108,7 @@ class AIPredictionEngine:
             med_effects_html.append("<br>".join(summary_points))
 
         meds_section = "<br>".join(med_effects_html)
+        timeline_section = self._get_24h_timeline(disease, day, data, medications, sim_hour, sim_minute)
 
         # Build HTML report
 
@@ -117,7 +118,7 @@ class AIPredictionEngine:
   <span style="color: #4fc3f7; font-size: 15px; font-weight: bold; letter-spacing: 0.5px;">
     AI HEALTH ANALYSIS REPORT
   </span><br>
-  <span style="color: #3a6ea0;">Disease: {disease} | Day {day} of 21</span>
+  <span style="color: #3a6ea0;">Disease: {disease} | Day {day} of {max_days} @ {sim_hour:02d}:{sim_minute:02d}</span>
 </div>
 
 <span style="color: #4fc3f7; font-size: 13px; font-weight: bold; letter-spacing: 0.5px;">━━ SEVERITY ASSESSMENT ━━</span><br>
@@ -136,6 +137,10 @@ Composite Risk Score: {colored(f'{composite_risk:.0f}/100', 'CRITICAL' if compos
 
 <span style="color: #4fc3f7; font-size: 13px; font-weight: bold; letter-spacing: 0.5px;">━━ COMPLICATIONS FORECAST ━━</span><br>
 {"".join(f'• {c}<br>' for c in complications)}
+<br>
+
+<span style="color: #4fc3f7; font-size: 13px; font-weight: bold; letter-spacing: 0.5px;">━━ 24-HOUR CLINICAL TIMELINE (TODAY) ━━</span><br>
+{timeline_section}<br>
 <br>
 
 <span style="color: #4fc3f7; font-size: 13px; font-weight: bold; letter-spacing: 0.5px;">━━ TREATMENT RESPONSE ━━</span><br>
@@ -197,3 +202,82 @@ Estimated Recovery: {colored(f'~{recovery_days} days remaining', 'GOOD' if recov
         if medications:
             outlook += f". Treatment protocol reducing severity by estimated {len(medications) * 15}%."
         return outlook
+
+    def _get_24h_timeline(self, disease: str, day: int, data: Dict, medications: List[str], sim_hour: int, sim_minute: int) -> str:
+        temp_c = data.get('temperature', 36.6)
+        temp_f = temp_c * 1.8 + 32.0
+        hr = data.get('heart_rate', 72)
+        pain = data.get('pain_level', 0)
+        fatigue = data.get('fatigue', 0)
+        hydration = data.get('hydration', 100)
+        wbc = data.get('wbc_count', 7000)
+        platelets = data.get('platelet_count', 250)
+        hgb = data.get('hemoglobin', 15.0)
+
+        phases = [
+            ("00:00 - 06:00", "NIGHTTIME REST & METABOLIC BASAL STATE"),
+            ("06:00 - 12:00", "MORNING CIRCADIAN RISE & STRESS LEVEL"),
+            ("12:00 - 18:00", "MIDDAY IMMUNE INTERACTION & PEAK SYMPTOMS"),
+            ("18:00 - 24:00", "EVENING RECOVERY & THERMOLYSIS")
+        ]
+
+        html_lines = []
+        for time_range, phase_name in phases:
+            start_h = int(time_range.split(":")[0])
+            end_h = int(time_range.split(" - ")[1].split(":")[0])
+            is_active = (start_h <= sim_hour < end_h)
+
+            desc = ""
+            if disease == "Chikungunya":
+                joint_stiff = data.get('joint_stiffness', 0)
+                joint_swel = data.get('joint_swelling', 0)
+                muscle_pa = data.get('muscle_pain', 0)
+                joint_pain = data.get('joint_pain', pain)
+
+                if start_h == 0:
+                    desc = f"Synovial fluid is cool and static; patient experiences joint stiffness ({joint_stiff}%) and muscle soreness ({muscle_pa}%) during nighttime. Temperature: {temp_f:.1f}°F."
+                elif start_h == 6:
+                    desc = f"Morning circadian cortisol rise. Patient reports pronounced stiffness ({joint_stiff}%) and joint inflammation. Heart rate: {hr} bpm."
+                elif start_h == 12:
+                    desc = f"Peak daily joint pain ({joint_pain}%) and swelling ({joint_swel}%) restricts physical mobility. Hydration status: {hydration}%."
+                else:
+                    desc = f"Significant weakness persists into evening hours. General fatigue: {fatigue}%. Anti-inflammatory treatments active."
+
+            elif disease == "Dengue Fever":
+                leakage = data.get('plasma_leakage', 0)
+                bleeding = data.get('bleeding_risk', 0)
+
+                if start_h == 0:
+                    desc = f"Vascular permeability monitor active. Platelet count: {platelets}k/μL. Dehydration level at {100-hydration}%."
+                elif start_h == 6:
+                    desc = f"Circadian blood pressure shifts. Hemoglobin: {hgb} g/dL, indicating hematocrit status. WBC count: {wbc}/μL."
+                elif start_h == 12:
+                    desc = f"Midday retro-orbital headache and muscle pain peak. Fatigue: {fatigue}%. Plasma leakage rate: {leakage}%."
+                else:
+                    desc = f"Critical platelet crash warning. Hemorrhagic bleeding risk evaluated at {bleeding}%. Plasma leaking is {leakage}%."
+
+            else:  # Malaria
+                spleen = data.get('spleen_size', 1.0)
+                parasites = data.get('parasite_load', 0)
+                cyclic_phase = data.get('cyclic_phase', 'Fever')
+
+                if start_h == 0:
+                    desc = f"Basal metabolic strain from red blood cell lysis. Spleen enlargement is {spleen}x. Parasite count: {parasites}/μL."
+                elif start_h == 6:
+                    desc = f"Circ circadian immune response. Hemoglobin: {hgb} g/dL, checking for severe hemolytic anemia."
+                elif start_h == 12:
+                    desc = f"Patient is in cyclic **{cyclic_phase.upper()}** phase. Temperature: {temp_f:.1f}°F. Tachycardia risk with heart rate of {hr} bpm."
+                else:
+                    desc = f"Profuse sweating and heat dissipation as paroxysm completes. Fatigue is {fatigue}%. Rehydration is crucial (hydration: {hydration}%)."
+
+            # Formatting
+            if is_active:
+                phase_title = f'<span style="color:#ffd600; font-weight:bold;">● {phase_name} ({time_range}) &lt;ACTIVE&gt;</span>'
+                phase_desc = f'<span style="color:#ffffff;">• {desc}</span>'
+            else:
+                phase_title = f'<span style="color:#3a6ea0;">○ {phase_name} ({time_range})</span>'
+                phase_desc = f'<span style="color:#5c8dbf;">• {desc}</span>'
+
+            html_lines.append(f"{phase_title}<br>{phase_desc}")
+
+        return "<br>".join(html_lines)
