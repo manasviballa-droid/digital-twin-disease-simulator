@@ -531,6 +531,16 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(5, 5, 5, 5)
         layout.setSpacing(5)
 
+        # Charts tabs
+        self.charts = ChartsWidget()
+        self.charts.setMinimumHeight(320)
+        
+        # Instantiate organ detailed status panel and add it to the charts tab widget
+        self.organ_detail_panel = OrganDetailPanel()
+        self.charts.tab_widget.addTab(self.organ_detail_panel, "◈ Organ Scanner")
+        
+        layout.addWidget(self.charts)
+
         # 3D Body model
         body_container = QGroupBox("  3D HUMAN BODY MODEL — INTERACTIVE DISEASE VISUALIZATION")
         body_layout = QVBoxLayout(body_container)
@@ -553,16 +563,6 @@ class MainWindow(QMainWindow):
         ctrl_layout.addWidget(self.view_combo)
         body_layout.addLayout(ctrl_layout)
         layout.addWidget(body_container)
-
-        # Charts tabs
-        self.charts = ChartsWidget()
-        self.charts.setMinimumHeight(320)
-        
-        # Instantiate organ detailed status panel and add it to the charts tab widget
-        self.organ_detail_panel = OrganDetailPanel()
-        self.charts.tab_widget.addTab(self.organ_detail_panel, "◈ Organ Scanner")
-        
-        layout.addWidget(self.charts)
 
         return container
 
