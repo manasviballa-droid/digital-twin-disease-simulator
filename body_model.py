@@ -228,7 +228,7 @@ class BodyModelWidget(QWidget):
     def _draw_body(self, progression, data):
         colors = DISEASE_COLORS.get(self.current_disease, DISEASE_COLORS["Malaria"])
         p = progression
-        n = 18  # mesh resolution
+        n = 10  # mesh resolution (optimized from 18 to reduce polygon count and increase rendering speed)
         # Body skin is transparent when a disease is selected to show internal organs (increased visibility)
         def alpha(base_alpha):
             if self.selected_organ is not None:
@@ -486,6 +486,7 @@ class BodyModelWidget(QWidget):
             else:
                 alpha_val = 0.05
 
+        xs, ys, zs = [], [], []
         for _ in range(num_dots):
             # Random position on torso/limbs
             part = rng.choice(['torso', 'arm', 'leg'])
@@ -501,9 +502,13 @@ class BodyModelWidget(QWidget):
                 x = rng.choice([-1, 1]) * rng.uniform(0.15, 0.25)
                 y = rng.uniform(-0.1, 0.1)
                 z = rng.uniform(-1.1, 0.0)
+            xs.append(x)
+            ys.append(y)
+            zs.append(z)
 
-            rx, ry, rz = make_sphere(x, y, z, 0.025, 0.02, 0.025, 6)
-            self.ax.plot_surface(rx, ry, rz, color=rash_col, alpha=alpha_val, linewidth=0)
+        if xs:
+            # Optimized: Plot all rash dots as a single 3D scatter collection instead of drawing 80 individual spheres
+            self.ax.scatter(xs, ys, zs, color=rash_col, alpha=alpha_val, s=12, depthshade=True)
 
     def _draw_labels(self, progression):
         """Draw organ labels with dotted leader lines when disease is active."""
