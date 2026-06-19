@@ -495,7 +495,7 @@ class MainWindow(QMainWindow):
         speed_lbl = QLabel("SPEED:")
         speed_lbl.setStyleSheet("color: #5a8fd4; font-size: 10px;")
         self.speed_combo = QComboBox()
-        self.speed_combo.addItems(["0.5x", "1x", "2x", "5x"])
+        self.speed_combo.addItems(["0.5x", "1x", "2x", "5x", "10x", "20x", "50x"])
         self.speed_combo.setCurrentIndex(1)
         speed_layout.addWidget(speed_lbl)
         speed_layout.addWidget(self.speed_combo)

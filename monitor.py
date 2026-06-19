@@ -623,7 +623,15 @@ class BedsideMonitorWidget(QWidget):
 
     def set_simulation_speed(self, speed_text):
         """Sets simulated clock speed multiplier based on combo text."""
-        factors = {"0.5x": 36, "1x": 72, "2x": 144, "5x": 360}
+        factors = {
+            "0.5x": 36,
+            "1x": 72,
+            "2x": 144,
+            "5x": 360,
+            "10x": 720,
+            "20x": 1440,
+            "50x": 3600
+        }
         self.sim_tick_seconds = factors.get(speed_text, 72)
 
     def toggle_timer(self):
