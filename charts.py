@@ -11,6 +11,7 @@ from matplotlib.figure import Figure
 from matplotlib.gridspec import GridSpec
 import matplotlib.patches as mpatches
 from matplotlib.lines import Line2D
+import matplotlib.ticker as mticker
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QTabWidget
 from PyQt6.QtCore import Qt
 from monitor import BedsideMonitorWidget
@@ -46,6 +47,8 @@ def safe_clear_axis(ax):
     Safely clear an axes object without triggering matplotlib recursion errors.
     This avoids the ax.clear() method which can cause circular references in matplotlib.
     """
+    if ax is None:
+        return
     try:
         # Remove all line artists
         while len(ax.lines) > 0:
@@ -76,9 +79,11 @@ def safe_clear_axis(ax):
         ax.set_xlim(0, 1)
         ax.set_ylim(0, 1)
         
-        # Clear tick labels
-        ax.set_xticks([])
-        ax.set_yticks([])
+        # Restore auto-scaling and tick locators
+        ax.xaxis.set_major_locator(mticker.AutoLocator())
+        ax.yaxis.set_major_locator(mticker.AutoLocator())
+        ax.xaxis.set_minor_locator(mticker.NullLocator())
+        ax.yaxis.set_minor_locator(mticker.NullLocator())
         
     except Exception as e:
         print(f"Warning: Error clearing axis: {e}")
@@ -224,6 +229,8 @@ class ChartsWidget(QWidget):
                                     fontsize=8, fontweight='bold', fontfamily='monospace')
             self.ax_platelet.set_title("PLATELET COUNT (×10³/μL)", color=CHART_STYLE["title"],
                                         fontsize=8, fontweight='bold', fontfamily='monospace')
+            self.ax_platelet.set_xticks([])
+            self.ax_platelet.set_yticks([])
             return
 
         temps_c = [d.get('temperature', 36.6) for d in self.data_history]
@@ -267,6 +274,8 @@ class ChartsWidget(QWidget):
             for ax, t in [(self.ax_hr, "HEART RATE (bpm)"), (self.ax_bp, "BLOOD PRESSURE (mmHg)"),
                            (self.ax_spo2, "OXYGEN SATURATION (%)"), (self.ax_hgb, "HEMOGLOBIN (g/dL)")]:
                 style_ax(ax, t)
+                ax.set_xticks([])
+                ax.set_yticks([])
             return
 
         hrs = [d.get('heart_rate', 72) for d in self.data_history]
@@ -317,6 +326,8 @@ class ChartsWidget(QWidget):
                            (self.ax_severity, "DISEASE SEVERITY (%)"),
                            (self.ax_liver, "LIVER ENZYME TREND")]:
                 style_ax(ax, t)
+                ax.set_xticks([])
+                ax.set_yticks([])
             return
 
         marker_o = None if len(self.days) > 30 else 'o'
