@@ -80,6 +80,7 @@ def safe_clear_axis(ax):
         ax.set_ylim(0, 1)
         
         # Restore auto-scaling and tick locators
+        ax.autoscale(enable=True, axis='both')
         ax.xaxis.set_major_locator(mticker.AutoLocator())
         ax.yaxis.set_major_locator(mticker.AutoLocator())
         ax.xaxis.set_minor_locator(mticker.NullLocator())
